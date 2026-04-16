@@ -1,6 +1,11 @@
 import flet as ft
 import os
 from openai import OpenAI
+import requests
+import base64
+
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
+REPO_NAME = "아이디/레포이름"
 
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 import pytesseract
@@ -132,6 +137,42 @@ def generate_reading_knowledge(text, book_title, author, chapter, client):
     return response.choices[0].message.content
 
 
+def save_to_obsidian(content):
+
+    try:
+        # GPT 결과에서 저장 경로 추출
+        lines = content.split("\n")
+        path_line = lines[0].strip()
+
+        if "[저장 경로]" in path_line:
+            file_path = path_line.replace("[저장 경로]", "").strip()
+        else:
+            file_path = "00 inbox/auto_note.md"
+
+        file_path = file_path.replace(" ", "_") + ".md"
+
+        # 내용 인코딩
+        encoded_content = base64.b64encode(content.encode("utf-8")).decode("utf-8")
+
+        url = f"https://api.github.com/repos/{REPO_NAME}/contents/{file_path}"
+
+        data = {
+            "message": "auto note upload",
+            "content": encoded_content
+        }
+
+        headers = {
+            "Authorization": f"token {GITHUB_TOKEN}"
+        }
+
+        response = requests.put(url, json=data, headers=headers)
+
+        return response.status_code
+
+    except Exception as e:
+        return str(e)
+
+
 def main(page: ft.Page):
     page.title = "Obsidian Capture"
     page.bgcolor = "#0f172a"
@@ -225,6 +266,22 @@ def main(page: ft.Page):
         color="white",
     )
 
+    def obsidian_save_click(e):
+        result = save_to_obsidian(input_box.value)
+        if str(result).startswith("20"):
+            page.snack_bar = ft.SnackBar(ft.Text("저장 완료"), bgcolor="#22c55e")
+        else:
+            page.snack_bar = ft.SnackBar(ft.Text(f"저장 실패: {result}"), bgcolor="#ef4444")
+        page.snack_bar.open = True
+        page.update()
+
+    obsidian_save_btn = ft.ElevatedButton(
+        "옵시디언 저장",
+        on_click=obsidian_save_click,
+        bgcolor="#14b8a6",
+        color="white",
+    )
+
     page.add(
         ft.Column(
             [
@@ -235,7 +292,7 @@ def main(page: ft.Page):
                 chapter,
                 input_box,
                 ft.Row([image_btn, voice_btn], spacing=10),
-                ft.Row([save_btn, knowledge_btn], spacing=10)
+                ft.Row([save_btn, knowledge_btn, obsidian_save_btn], spacing=10)
             ]
         )
     )

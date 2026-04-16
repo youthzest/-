@@ -2,3 +2,4 @@ flet==0.22.0
 openai
 pytesseract
 Pillow
+requests
