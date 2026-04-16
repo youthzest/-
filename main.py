@@ -9,17 +9,45 @@ REPO_NAME = "아이디/레포이름"
 APP_PASSWORD = os.environ.get("APP_PASSWORD")
 
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
-import pytesseract
-from PIL import Image
 
 def handle_image_upload(e, input_box, page):
     if e.files:
         file = e.files[0]
+
+        input_box.value += "\n[이미지 분석 중...]"
+        page.update()
+
         try:
-            text = pytesseract.image_to_string(Image.open(file.path))
-            input_box.value += f"\n[이미지 내용]\n{text}"
-        except:
-            input_box.value += "\n[이미지 처리 실패]"
+            import base64
+
+            with open(file.path, "rb") as image_file:
+                image_base64 = base64.b64encode(image_file.read()).decode()
+
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": "이미지의 텍스트를 추출해줘"},
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/png;base64,{image_base64}"
+                                },
+                            },
+                        ],
+                    }
+                ],
+            )
+
+            extracted_text = response.choices[0].message.content
+
+            input_box.value += f"\n[이미지 내용]\n{extracted_text}"
+
+        except Exception as err:
+            input_box.value += f"\n[이미지 처리 실패] {err}"
+
         page.update()
 
 def handle_voice_upload(e, input_box, page):
@@ -165,10 +193,10 @@ def save_to_obsidian(content):
         if file_path.startswith("/"):
             file_path = file_path[1:]
 
-        file_path = file_path.replace(" ", "_")
-
         if file_path.endswith(".md"):
             file_path = file_path[:-3]
+
+        file_path = file_path.replace(" ", "_")
 
         file_path = file_path + ".md"
 
