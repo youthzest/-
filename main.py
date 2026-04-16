@@ -159,7 +159,18 @@ def save_to_obsidian(content):
         else:
             file_path = "00 inbox/auto_note.md"
 
-        file_path = file_path.replace(" ", "_") + ".md"
+        file_path = file_path.replace("`", "")
+        file_path = file_path.strip()
+
+        if file_path.startswith("/"):
+            file_path = file_path[1:]
+
+        if not file_path.endswith(".md"):
+            file_path = file_path + ".md"
+
+        file_path = file_path.replace(" ", "_")
+
+        print("저장 경로:", file_path)
 
         # 내용 인코딩
         encoded_content = base64.b64encode(content.encode("utf-8")).decode("utf-8")
