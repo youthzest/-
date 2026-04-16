@@ -1,4 +1,8 @@
 import flet as ft
+import os
+from openai import OpenAI
+
+client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 import pytesseract
 from PIL import Image
 
@@ -14,8 +18,23 @@ def handle_image_upload(e, input_box, page):
 
 def handle_voice_upload(e, input_box, page):
     if e.files:
-        input_box.value += "\n[음성 파일 업로드 완료]"
-        input_box.value += "\n[음성 → 텍스트 변환은 다음 단계에서 연결]"
+        file = e.files[0]
+
+        input_box.value += "\n[음성 분석 중...]"
+        page.update()
+
+        try:
+            with open(file.path, "rb") as audio_file:
+                transcript = client.audio.transcriptions.create(
+                    model="gpt-4o-transcribe",
+                    file=audio_file
+                )
+
+            input_box.value += f"\n[음성 내용]\n{transcript.text}"
+
+        except Exception as err:
+            input_box.value += f"\n[음성 처리 실패] {err}"
+
         page.update()
 
 
