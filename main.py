@@ -38,6 +38,39 @@ def handle_voice_upload(e, input_box, page):
         page.update()
 
 
+def generate_knowledge(text, client):
+    prompt = f"""
+당신은 옵시디언 기반 지식 시스템을 구축하는 전문가이다.
+
+다음 내용을 지식 네트워크 문서로 변환하라:
+
+{text}
+
+조건:
+- 폴더 경로 포함
+- 제목 자동 생성
+- 최소 3개 이상의 [[링크]]
+- 태그 포함
+- 마크다운 형식
+
+출력 형식:
+[저장 경로]
+문서내용
+링크목록
+태그목록
+"""
+
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": "너는 지식 구조화 전문가다"},
+            {"role": "user", "content": prompt}
+        ]
+    )
+
+    return response.choices[0].message.content
+
+
 def main(page: ft.Page):
     page.title = "Obsidian Capture"
     page.bgcolor = "#0f172a"
@@ -92,13 +125,29 @@ def main(page: ft.Page):
         color="white",
     )
 
+    # 지식 생성
+    def knowledge_click(e):
+        try:
+            result = generate_knowledge(input_box.value, client)
+            input_box.value = result
+        except Exception as err:
+            input_box.value = f"에러 발생: {err}"
+        page.update()
+
+    knowledge_btn = ft.ElevatedButton(
+        "지식 생성",
+        on_click=knowledge_click,
+        bgcolor="#8b5cf6",
+        color="white",
+    )
+
     page.add(
         ft.Column(
             [
                 ft.Text("Obsidian Capture", size=28, color="white"),
                 input_box,
                 ft.Row([image_btn, voice_btn], spacing=10),
-                save_btn
+                ft.Row([save_btn, knowledge_btn], spacing=10)
             ]
         )
     )
