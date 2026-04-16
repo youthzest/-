@@ -165,12 +165,14 @@ def save_to_obsidian(content):
         if file_path.startswith("/"):
             file_path = file_path[1:]
 
-        if not file_path.endswith(".md"):
-            file_path = file_path + ".md"
-
         file_path = file_path.replace(" ", "_")
 
-        print("저장 경로:", file_path)
+        if file_path.endswith(".md"):
+            file_path = file_path[:-3]
+
+        file_path = file_path + ".md"
+
+        print("최종 저장 경로:", file_path)
 
         # 내용 인코딩
         encoded_content = base64.b64encode(content.encode("utf-8")).decode("utf-8")
