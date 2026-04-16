@@ -223,6 +223,7 @@ def main(page: ft.Page):
         ft.Container(height=10),
         ft.Row([status_text], alignment=ft.MainAxisAlignment.CENTER)
     )
+    page.add(ft.Text("앱 실행 성공"))
 
 if __name__ == "__main__":
-    ft.app(target=main)
+    ft.app(target=main, port=10000)
