@@ -6,6 +6,7 @@ import base64
 
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
 REPO_NAME = "아이디/레포이름"
+APP_PASSWORD = os.environ.get("APP_PASSWORD")
 
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 import pytesseract
@@ -178,123 +179,147 @@ def main(page: ft.Page):
     page.bgcolor = "#0f172a"
     page.padding = 20
     page.scroll = "auto"
+    def build_main_ui():
+        # 독서 모드 토글
+        def toggle_reading_mode(e):
+            is_mode_on = reading_mode_switch.value
+            book_title.visible = is_mode_on
+            author.visible = is_mode_on
+            chapter.visible = is_mode_on
+            page.update()
 
-    # 독서 모드 토글
-    def toggle_reading_mode(e):
-        is_mode_on = reading_mode_switch.value
-        book_title.visible = is_mode_on
-        author.visible = is_mode_on
-        chapter.visible = is_mode_on
-        page.update()
+        reading_mode_switch = ft.Switch(label="독서 모드", value=False, on_change=toggle_reading_mode)
 
-    reading_mode_switch = ft.Switch(label="독서 모드", value=False, on_change=toggle_reading_mode)
+        book_title = ft.TextField(label="책 제목", bgcolor="#1e293b", color="white", visible=False)
+        author = ft.TextField(label="저자", bgcolor="#1e293b", color="white", visible=False)
+        chapter = ft.TextField(label="챕터 (선택)", bgcolor="#1e293b", color="white", visible=False)
 
-    book_title = ft.TextField(label="책 제목", bgcolor="#1e293b", color="white", visible=False)
-    author = ft.TextField(label="저자", bgcolor="#1e293b", color="white", visible=False)
-    chapter = ft.TextField(label="챕터 (선택)", bgcolor="#1e293b", color="white", visible=False)
-
-    # 텍스트 입력
-    input_box = ft.TextField(
-        hint_text="여기에 기록하세요...",
-        multiline=True,
-        min_lines=5,
-        max_lines=10,
-        bgcolor="#1e293b",
-        color="white",
-    )
-
-    # 이미지 파일 선택창
-    image_picker = ft.FilePicker(on_result=lambda e: handle_image_upload(e, input_box, page))
-    page.overlay.append(image_picker)
-
-    image_btn = ft.ElevatedButton(
-        "📷 이미지 추가",
-        on_click=lambda _: image_picker.pick_files(allow_multiple=False),
-        bgcolor="#334155",
-        color="white",
-    )
-
-    # 음성 파일 선택창
-    voice_picker = ft.FilePicker(on_result=lambda e: handle_voice_upload(e, input_box, page))
-    page.overlay.append(voice_picker)
-
-    voice_btn = ft.ElevatedButton(
-        "🎤 음성 기록",
-        on_click=lambda _: voice_picker.pick_files(allow_multiple=False),
-        bgcolor="#334155",
-        color="white",
-    )
-
-    # 저장
-    def save_click(e):
-        page.snack_bar = ft.SnackBar(
-            ft.Text("저장 완료"),
-            bgcolor="#22c55e"
+        # 텍스트 입력
+        input_box = ft.TextField(
+            hint_text="여기에 기록하세요...",
+            multiline=True,
+            min_lines=5,
+            max_lines=10,
+            bgcolor="#1e293b",
+            color="white",
         )
-        page.snack_bar.open = True
-        page.update()
 
-    save_btn = ft.ElevatedButton(
-        "저장하기",
-        on_click=save_click,
-        bgcolor="#3b82f6",
-        color="white",
-    )
+        # 이미지 파일 선택창
+        image_picker = ft.FilePicker(on_result=lambda e: handle_image_upload(e, input_box, page))
+        page.overlay.append(image_picker)
 
-    # 지식 생성
-    def knowledge_click(e):
-        try:
-            if reading_mode_switch.value:
-                result = generate_reading_knowledge(
-                    input_box.value, 
-                    book_title.value, 
-                    author.value, 
-                    chapter.value, 
-                    client
-                )
+        image_btn = ft.ElevatedButton(
+            "📷 이미지 추가",
+            on_click=lambda _: image_picker.pick_files(allow_multiple=False),
+            bgcolor="#334155",
+            color="white",
+        )
+
+        # 음성 파일 선택창
+        voice_picker = ft.FilePicker(on_result=lambda e: handle_voice_upload(e, input_box, page))
+        page.overlay.append(voice_picker)
+
+        voice_btn = ft.ElevatedButton(
+            "🎤 음성 기록",
+            on_click=lambda _: voice_picker.pick_files(allow_multiple=False),
+            bgcolor="#334155",
+            color="white",
+        )
+
+        # 저장
+        def save_click(e):
+            page.snack_bar = ft.SnackBar(
+                ft.Text("저장 완료"),
+                bgcolor="#22c55e"
+            )
+            page.snack_bar.open = True
+            page.update()
+
+        save_btn = ft.ElevatedButton(
+            "저장하기",
+            on_click=save_click,
+            bgcolor="#3b82f6",
+            color="white",
+        )
+
+        # 지식 생성
+        def knowledge_click(e):
+            try:
+                if reading_mode_switch.value:
+                    result = generate_reading_knowledge(
+                        input_box.value, 
+                        book_title.value, 
+                        author.value, 
+                        chapter.value, 
+                        client
+                    )
+                else:
+                    result = generate_knowledge(input_box.value, client)
+                input_box.value = result
+            except Exception as err:
+                input_box.value = f"에러 발생: {err}"
+            page.update()
+
+        knowledge_btn = ft.ElevatedButton(
+            "지식 생성",
+            on_click=knowledge_click,
+            bgcolor="#8b5cf6",
+            color="white",
+        )
+
+        def obsidian_save_click(e):
+            result = save_to_obsidian(input_box.value)
+            if str(result).startswith("20"):
+                page.snack_bar = ft.SnackBar(ft.Text("저장 완료"), bgcolor="#22c55e")
             else:
-                result = generate_knowledge(input_box.value, client)
-            input_box.value = result
-        except Exception as err:
-            input_box.value = f"에러 발생: {err}"
-        page.update()
+                page.snack_bar = ft.SnackBar(ft.Text(f"저장 실패: {result}"), bgcolor="#ef4444")
+            page.snack_bar.open = True
+            page.update()
 
-    knowledge_btn = ft.ElevatedButton(
-        "지식 생성",
-        on_click=knowledge_click,
-        bgcolor="#8b5cf6",
-        color="white",
-    )
-
-    def obsidian_save_click(e):
-        result = save_to_obsidian(input_box.value)
-        if str(result).startswith("20"):
-            page.snack_bar = ft.SnackBar(ft.Text("저장 완료"), bgcolor="#22c55e")
-        else:
-            page.snack_bar = ft.SnackBar(ft.Text(f"저장 실패: {result}"), bgcolor="#ef4444")
-        page.snack_bar.open = True
-        page.update()
-
-    obsidian_save_btn = ft.ElevatedButton(
-        "옵시디언 저장",
-        on_click=obsidian_save_click,
-        bgcolor="#14b8a6",
-        color="white",
-    )
-
-    page.add(
-        ft.Column(
-            [
-                ft.Text("Obsidian Capture", size=28, color="white"),
-                reading_mode_switch,
-                book_title,
-                author,
-                chapter,
-                input_box,
-                ft.Row([image_btn, voice_btn], spacing=10),
-                ft.Row([save_btn, knowledge_btn, obsidian_save_btn], spacing=10)
-            ]
+        obsidian_save_btn = ft.ElevatedButton(
+            "옵시디언 저장",
+            on_click=obsidian_save_click,
+            bgcolor="#14b8a6",
+            color="white",
         )
-    )
 
+        page.add(
+            ft.Column(
+                [
+                    ft.Text("Obsidian Capture", size=28, color="white"),
+                    reading_mode_switch,
+                    book_title,
+                    author,
+                    chapter,
+                    input_box,
+                    ft.Row([image_btn, voice_btn], spacing=10),
+                    ft.Row([save_btn, knowledge_btn, obsidian_save_btn], spacing=10)
+                ]
+            )
+        )
+
+
+    is_authenticated = False
+    password_input = ft.TextField(password=True, bgcolor="#1e293b", color="white")
+
+    def check_password(e):
+        if password_input.value == APP_PASSWORD:
+            page.session.set("auth", True)
+            page.clean()
+            build_main_ui()
+        else:
+            page.snack_bar = ft.SnackBar(ft.Text("비밀번호 틀림"))
+            page.snack_bar.open = True
+            page.update()
+
+    if page.session.get("auth"):
+        build_main_ui()
+    else:
+        page.add(
+            ft.Column([
+                ft.Text("비밀번호 입력", size=20, color="white"),
+                password_input,
+                ft.ElevatedButton("로그인", on_click=check_password)
+            ])
+        )
 ft.app(target=main, port=10000)
