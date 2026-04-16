@@ -23,25 +23,34 @@ def handle_image_upload(e, input_box, page):
         page.update()
 
 def handle_voice_upload(e, input_box, page):
-    if e.files:
-        file = e.files[0]
+    audio_file = e.files[0] if e.files else None
+    
+    if audio_file and hasattr(audio_file, 'path'):
+        audio_file = audio_file.path
 
-        input_box.value += "\n[음성 분석 중...]"
+    print(audio_file)
+
+    if not audio_file:
+        input_box.value = "음성 파일이 선택되지 않았습니다"
         page.update()
+        return
 
-        try:
-            with open(file.path, "rb") as audio_file:
-                transcript = client.audio.transcriptions.create(
-                    model="gpt-4o-transcribe",
-                    file=audio_file
-                )
+    input_box.value += "\n[음성 분석 중...]"
+    page.update()
 
-            input_box.value += f"\n[음성 내용]\n{transcript.text}"
+    try:
+        with open(audio_file, "rb") as f:
+            transcript = client.audio.transcriptions.create(
+                model="gpt-4o-transcribe",
+                file=f
+            )
 
-        except Exception as err:
-            input_box.value += f"\n[음성 처리 실패] {err}"
+        input_box.value += f"\n[음성 내용]\n{transcript.text}"
 
-        page.update()
+    except Exception as err:
+        input_box.value += f"\n[음성 처리 실패] {err}"
+
+    page.update()
 
 
 def generate_knowledge(text, client):
