@@ -71,11 +71,86 @@ def generate_knowledge(text, client):
     return response.choices[0].message.content
 
 
+def generate_reading_knowledge(text, book_title, author, chapter, client):
+
+    prompt = f"""
+당신은 독서를 지식 네트워크로 변환하는 전문가이다.
+
+다음 독서 내용을 분석하여 옵시디언 지식 문서로 변환하라:
+
+[메타 정보]
+책: {book_title}
+저자: {author}
+챕터: {chapter}
+
+[내용]
+{text}
+
+---
+
+반드시 아래를 수행하라:
+
+1. 핵심 개념 2~3개 추출
+2. 저자의 주장 구조 분석
+3. 기존 개념과 연결 (추상 개념 포함)
+4. 나의 적용 가능성 도출
+5. 책 자체를 하나의 노드로 생성 [[{book_title}]]
+
+---
+
+출력 형식:
+
+[저장 경로]
+
+# 제목
+
+## 핵심 개념
+
+## 저자 주장 구조
+
+## 나의 해석
+
+## 적용 가능성
+
+## 연결 개념
+
+(여기에 [[링크]] 3~5개 생성)
+
+---
+
+태그도 생성하라
+"""
+
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": "너는 독서를 구조화하는 전문가다"},
+            {"role": "user", "content": prompt}
+        ]
+    )
+
+    return response.choices[0].message.content
+
+
 def main(page: ft.Page):
     page.title = "Obsidian Capture"
     page.bgcolor = "#0f172a"
     page.padding = 20
     page.scroll = "auto"
+
+    # 독서 모드 토글
+    def toggle_reading_mode(e):
+        is_mode_on = reading_mode_switch.value
+        book_title.visible = is_mode_on
+        author.visible = is_mode_on
+        chapter.visible = is_mode_on
+        page.update()
+
+    reading_mode_switch = ft.Switch(label="독서 모드", value=False, on_change=toggle_reading_mode)
+
+    book_title = ft.TextField(label="책 제목", bgcolor="#1e293b", color="white", visible=False)
+    author = ft.TextField(label="저자", bgcolor="#1e293b", color="white", visible=False)
+    chapter = ft.TextField(label="챕터 (선택)", bgcolor="#1e293b", color="white", visible=False)
 
     # 텍스트 입력
     input_box = ft.TextField(
@@ -128,7 +203,16 @@ def main(page: ft.Page):
     # 지식 생성
     def knowledge_click(e):
         try:
-            result = generate_knowledge(input_box.value, client)
+            if reading_mode_switch.value:
+                result = generate_reading_knowledge(
+                    input_box.value, 
+                    book_title.value, 
+                    author.value, 
+                    chapter.value, 
+                    client
+                )
+            else:
+                result = generate_knowledge(input_box.value, client)
             input_box.value = result
         except Exception as err:
             input_box.value = f"에러 발생: {err}"
@@ -145,6 +229,10 @@ def main(page: ft.Page):
         ft.Column(
             [
                 ft.Text("Obsidian Capture", size=28, color="white"),
+                reading_mode_switch,
+                book_title,
+                author,
+                chapter,
                 input_box,
                 ft.Row([image_btn, voice_btn], spacing=10),
                 ft.Row([save_btn, knowledge_btn], spacing=10)
