@@ -176,6 +176,7 @@ def main(page: ft.Page):
 
         # 텍스트 입력
         input_box = ft.TextField(
+            value="",
             hint_text="여기에 기록하세요...",
             multiline=True,
             min_lines=5,
@@ -202,7 +203,15 @@ def main(page: ft.Page):
 
             try:
                 import base64
-                image_base64 = base64.b64encode(file.bytes).decode()
+                if file.bytes:
+                    image_data = file.bytes
+                elif hasattr(file, 'path') and file.path:
+                    with open(file.path, "rb") as image_file:
+                        image_data = image_file.read()
+                else:
+                    raise Exception("파일 데이터를 읽을 수 없습니다. (웹/모바일 환경 오류)")
+                
+                image_base64 = base64.b64encode(image_data).decode()
 
                 response = client.chat.completions.create(
                     model="gpt-4o-mini",
@@ -237,25 +246,24 @@ def main(page: ft.Page):
                 return
 
             audio_file = e.files[0]
-            if hasattr(audio_file, 'path'):
-                audio_file = audio_file.path
-
-            print(audio_file)
-
-            if not audio_file:
-                input_box.value = "음성 파일이 선택되지 않았습니다"
-                page.update()
-                return
-
+            
             input_box.value += "\n[음성 분석 중...]"
             page.update()
 
             try:
-                with open(audio_file, "rb") as f:
-                    transcript = client.audio.transcriptions.create(
-                        model="gpt-4o-transcribe",
-                        file=f
-                    )
+                import io
+                if audio_file.bytes:
+                    file_obj = io.BytesIO(audio_file.bytes)
+                    file_obj.name = audio_file.name
+                elif hasattr(audio_file, 'path') and audio_file.path:
+                    file_obj = open(audio_file.path, "rb")
+                else:
+                    raise Exception("파일 데이터를 찾을 수 없습니다. (웹/모바일 환경 오류)")
+
+                transcript = client.audio.transcriptions.create(
+                    model="gpt-4o-transcribe",
+                    file=file_obj
+                )
 
                 input_box.value += f"\n[음성 내용]\n{transcript.text}"
 
@@ -279,7 +287,7 @@ def main(page: ft.Page):
 
         voice_btn = ft.ElevatedButton(
             "🎤 음성 기록",
-            on_click=lambda _: voice_picker.pick_files(allow_multiple=False),
+            on_click=lambda _: voice_picker.pick_files(allow_multiple=False, with_data=True),
             bgcolor="#334155",
             color="white",
         )
