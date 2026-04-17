@@ -194,24 +194,15 @@ def main(page: ft.Page):
                 return
 
             f = e.files[0]
-            input_box.value += f"\n[이미지 여는 중... {f.name}]"
-            page.update()
-            
-            upload_url = page.get_upload_url(f.name, 60)
-            image_picker.upload([ft.FilePickerUploadFile(f.name, upload_url=upload_url)])
-
-        def handle_image_upload(e: ft.FilePickerUploadEvent):
-            if e.error:
-                input_box.value += f"\n이미지 읽기 오류: {e.error}"
-                page.update()
-                return
-                
             input_box.value += "\n[이미지 분석 중...]"
             page.update()
 
-            file_path = os.path.join("uploads", e.file_name)
             try:
-                with open(file_path, "rb") as image_file:
+                import base64
+                if not f.path:
+                    raise Exception("모바일 플랫폼 구조 제약: 경로 캐싱 실패")
+
+                with open(f.path, "rb") as image_file:
                     image_data = image_file.read()
                 
                 image_base64 = base64.b64encode(image_data).decode()
@@ -240,35 +231,25 @@ def main(page: ft.Page):
                 return
 
             f = e.files[0]
-            input_box.value += f"\n[음성 여는 중... {f.name}]"
-            page.update()
-
-            upload_url = page.get_upload_url(f.name, 60)
-            voice_picker.upload([ft.FilePickerUploadFile(f.name, upload_url=upload_url)])
-
-        def handle_voice_upload(e: ft.FilePickerUploadEvent):
-            if e.error:
-                input_box.value += f"\n음성 읽기 오류: {e.error}"
-                page.update()
-                return
-                
             input_box.value += "\n[음성 분석 중...]"
             page.update()
 
-            file_path = os.path.join("uploads", e.file_name)
             try:
-                with open(file_path, "rb") as f:
+                if not f.path:
+                    raise Exception("모바일 플랫폼 구조 제약: 경로 캐싱 실패")
+
+                with open(f.path, "rb") as audio_f:
                     transcript = client.audio.transcriptions.create(
                         model="gpt-4o-transcribe",
-                        file=f
+                        file=audio_f
                     )
                 input_box.value += f"\n[음성 내용]\n{transcript.text}"
             except Exception as err:
                 input_box.value += f"\n[음성 처리 실패] {err}"
             page.update()
 
-        image_picker = ft.FilePicker(on_result=handle_image_result, on_upload=handle_image_upload)
-        voice_picker = ft.FilePicker(on_result=handle_voice_result, on_upload=handle_voice_upload)
+        image_picker = ft.FilePicker(on_result=handle_image_result)
+        voice_picker = ft.FilePicker(on_result=handle_voice_result)
 
         page.overlay.append(image_picker)
         page.overlay.append(voice_picker)
