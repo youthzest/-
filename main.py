@@ -3,6 +3,9 @@ import os
 from openai import OpenAI
 import requests
 import base64
+from dotenv import load_dotenv
+
+load_dotenv()
 
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
 REPO_NAME = "youthzest/-"
@@ -194,19 +197,27 @@ def main(page: ft.Page):
                 return
 
             f = e.files[0]
-            input_box.value += "\n[이미지 분석 중...]"
+            input_box.value += f"\n[서버로 이미지 전송 중... {f.name}]"
+            page.update()
+            
+            upload_url = page.get_upload_url(f.name, 600)
+            image_picker.upload([ft.FilePickerUploadFile(f.name, upload_url=upload_url)])
+
+        def handle_image_upload(e: ft.FilePickerUploadEvent):
+            if e.error:
+                input_box.value += f"\n이미지 업로드 오류: {e.error}"
+                page.update()
+                return
+                
+            input_box.value += "\n[이미지 텍스트 인공지능 분석 중...]"
             page.update()
 
+            file_path = os.path.join("uploads", e.file_name)
             try:
                 import base64
-                if f.path:
-                    with open(f.path, "rb") as image_file:
-                        image_data = image_file.read()
-                elif f.bytes:
-                    image_data = f.bytes
-                else:
-                    raise Exception("모바일 웹 제약: 파일 크기가 너무 커서 메모리로 불러올 수 없습니다.")
-
+                with open(file_path, "rb") as image_file:
+                    image_data = image_file.read()
+                
                 image_base64 = base64.b64encode(image_data).decode()
                 
                 response = client.chat.completions.create(
@@ -233,32 +244,35 @@ def main(page: ft.Page):
                 return
 
             f = e.files[0]
-            input_box.value += "\n[음성 분석 중...]"
+            input_box.value += f"\n[서버로 음성 데이터 전송 중... {f.name}]"
             page.update()
 
-            try:
-                import io
-                if f.path:
-                    audio_f = open(f.path, "rb")
-                elif f.bytes:
-                    audio_f = io.BytesIO(f.bytes)
-                    audio_f.name = f.name
-                else:
-                    raise Exception("모바일 웹 제약: 파일 데이터를 불러오지 못했습니다.")
+            upload_url = page.get_upload_url(f.name, 600)
+            voice_picker.upload([ft.FilePickerUploadFile(f.name, upload_url=upload_url)])
 
-                transcript = client.audio.transcriptions.create(
-                    model="gpt-4o-transcribe",
-                    file=audio_f
-                )
+        def handle_voice_upload(e: ft.FilePickerUploadEvent):
+            if e.error:
+                input_box.value += f"\n음성 업로드 오류: {e.error}"
+                page.update()
+                return
+                
+            input_box.value += "\n[음성 인공지능 분석 중...]"
+            page.update()
+
+            file_path = os.path.join("uploads", e.file_name)
+            try:
+                with open(file_path, "rb") as audio_f:
+                    transcript = client.audio.transcriptions.create(
+                        model="gpt-4o-transcribe",
+                        file=audio_f
+                    )
                 input_box.value += f"\n[음성 내용]\n{transcript.text}"
-                if not f.path:
-                    audio_f.close()
             except Exception as err:
                 input_box.value += f"\n[음성 처리 실패] {err}"
             page.update()
 
-        image_picker = ft.FilePicker(on_result=handle_image_result)
-        voice_picker = ft.FilePicker(on_result=handle_voice_result)
+        image_picker = ft.FilePicker(on_result=handle_image_result, on_upload=handle_image_upload)
+        voice_picker = ft.FilePicker(on_result=handle_voice_result, on_upload=handle_voice_upload)
 
         page.overlay.extend([image_picker, voice_picker])
 
