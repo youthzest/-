@@ -264,14 +264,14 @@ def main(page: ft.Page):
 
         image_btn = ft.ElevatedButton(
             "📷 이미지 추가",
-            on_click=lambda _: image_picker.pick_files(allow_multiple=False, with_data=True),
+            on_click=lambda _: image_picker.pick_files(allow_multiple=False),
             bgcolor="#334155",
             color="white",
         )
 
         voice_btn = ft.ElevatedButton(
             "🎤 음성 기록",
-            on_click=lambda _: voice_picker.pick_files(allow_multiple=False, with_data=True),
+            on_click=lambda _: voice_picker.pick_files(allow_multiple=False),
             bgcolor="#334155",
             color="white",
         )
