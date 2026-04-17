@@ -199,12 +199,14 @@ def main(page: ft.Page):
 
             try:
                 import base64
-                if not f.path:
-                    raise Exception("모바일 플랫폼 구조 제약: 경로 캐싱 실패")
+                if f.path:
+                    with open(f.path, "rb") as image_file:
+                        image_data = image_file.read()
+                elif f.bytes:
+                    image_data = f.bytes
+                else:
+                    raise Exception("모바일 웹 제약: 파일 크기가 너무 커서 메모리로 불러올 수 없습니다.")
 
-                with open(f.path, "rb") as image_file:
-                    image_data = image_file.read()
-                
                 image_base64 = base64.b64encode(image_data).decode()
                 
                 response = client.chat.completions.create(
@@ -235,15 +237,22 @@ def main(page: ft.Page):
             page.update()
 
             try:
-                if not f.path:
-                    raise Exception("모바일 플랫폼 구조 제약: 경로 캐싱 실패")
+                import io
+                if f.path:
+                    audio_f = open(f.path, "rb")
+                elif f.bytes:
+                    audio_f = io.BytesIO(f.bytes)
+                    audio_f.name = f.name
+                else:
+                    raise Exception("모바일 웹 제약: 파일 데이터를 불러오지 못했습니다.")
 
-                with open(f.path, "rb") as audio_f:
-                    transcript = client.audio.transcriptions.create(
-                        model="gpt-4o-transcribe",
-                        file=audio_f
-                    )
+                transcript = client.audio.transcriptions.create(
+                    model="gpt-4o-transcribe",
+                    file=audio_f
+                )
                 input_box.value += f"\n[음성 내용]\n{transcript.text}"
+                if not f.path:
+                    audio_f.close()
             except Exception as err:
                 input_box.value += f"\n[음성 처리 실패] {err}"
             page.update()
@@ -251,19 +260,18 @@ def main(page: ft.Page):
         image_picker = ft.FilePicker(on_result=handle_image_result)
         voice_picker = ft.FilePicker(on_result=handle_voice_result)
 
-        page.overlay.append(image_picker)
-        page.overlay.append(voice_picker)
+        page.overlay.extend([image_picker, voice_picker])
 
         image_btn = ft.ElevatedButton(
             "📷 이미지 추가",
-            on_click=lambda _: image_picker.pick_files(allow_multiple=False),
+            on_click=lambda _: image_picker.pick_files(allow_multiple=False, with_data=True),
             bgcolor="#334155",
             color="white",
         )
 
         voice_btn = ft.ElevatedButton(
             "🎤 음성 기록",
-            on_click=lambda _: voice_picker.pick_files(allow_multiple=False),
+            on_click=lambda _: voice_picker.pick_files(allow_multiple=False, with_data=True),
             bgcolor="#334155",
             color="white",
         )
