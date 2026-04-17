@@ -10,79 +10,6 @@ APP_PASSWORD = os.environ.get("APP_PASSWORD")
 
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
-def handle_image_upload(e, input_box, page):
-    if not e.files or not e.files[0]:
-        input_box.value += "\n이미지 파일 없음"
-        page.update()
-        return
-
-    file = e.files[0]
-
-    input_box.value += "\n[이미지 분석 중...]"
-    page.update()
-
-    try:
-        import base64
-
-        image_base64 = base64.b64encode(file.bytes).decode()
-
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": "이미지의 텍스트를 추출해줘"},
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/png;base64,{image_base64}"
-                            },
-                        },
-                    ],
-                }
-            ],
-        )
-
-        extracted_text = response.choices[0].message.content
-
-        input_box.value += f"\n[이미지 내용]\n{extracted_text}"
-
-    except Exception as err:
-        input_box.value += f"\n[이미지 처리 실패] {err}"
-
-    page.update()
-
-def handle_voice_upload(e, input_box, page):
-    audio_file = e.files[0] if e.files else None
-    
-    if audio_file and hasattr(audio_file, 'path'):
-        audio_file = audio_file.path
-
-    print(audio_file)
-
-    if not audio_file:
-        input_box.value = "음성 파일이 선택되지 않았습니다"
-        page.update()
-        return
-
-    input_box.value += "\n[음성 분석 중...]"
-    page.update()
-
-    try:
-        with open(audio_file, "rb") as f:
-            transcript = client.audio.transcriptions.create(
-                model="gpt-4o-transcribe",
-                file=f
-            )
-
-        input_box.value += f"\n[음성 내용]\n{transcript.text}"
-
-    except Exception as err:
-        input_box.value += f"\n[음성 처리 실패] {err}"
-
-    page.update()
-
 
 def generate_knowledge(text, client):
     prompt = f"""
@@ -257,9 +184,91 @@ def main(page: ft.Page):
             color="white",
         )
 
-        # 이미지 파일 선택창
-        image_picker = ft.FilePicker(on_result=lambda e: handle_image_upload(e, input_box, page))
+        def handle_image_upload(e):
+            if not e.files:
+                input_box.value += "\n이미지 없음"
+                page.update()
+                return
+
+            file = e.files[0]
+
+            if not file:
+                input_box.value += "\n이미지 파일 없음"
+                page.update()
+                return
+
+            input_box.value += "\n[이미지 분석 중...]"
+            page.update()
+
+            try:
+                import base64
+                image_base64 = base64.b64encode(file.bytes).decode()
+
+                response = client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": [
+                                {"type": "text", "text": "이미지의 텍스트를 추출해줘"},
+                                {
+                                    "type": "image_url",
+                                    "image_url": {
+                                        "url": f"data:image/png;base64,{image_base64}"
+                                    },
+                                },
+                            ],
+                        }
+                    ],
+                )
+
+                extracted_text = response.choices[0].message.content
+                input_box.value += f"\n[이미지 내용]\n{extracted_text}"
+
+            except Exception as err:
+                input_box.value += f"\n[이미지 처리 실패] {err}"
+
+            page.update()
+
+        def handle_voice_upload(e):
+            if not e.files:
+                input_box.value += "\n음성 파일 없음"
+                page.update()
+                return
+
+            audio_file = e.files[0]
+            if hasattr(audio_file, 'path'):
+                audio_file = audio_file.path
+
+            print(audio_file)
+
+            if not audio_file:
+                input_box.value = "음성 파일이 선택되지 않았습니다"
+                page.update()
+                return
+
+            input_box.value += "\n[음성 분석 중...]"
+            page.update()
+
+            try:
+                with open(audio_file, "rb") as f:
+                    transcript = client.audio.transcriptions.create(
+                        model="gpt-4o-transcribe",
+                        file=f
+                    )
+
+                input_box.value += f"\n[음성 내용]\n{transcript.text}"
+
+            except Exception as err:
+                input_box.value += f"\n[음성 처리 실패] {err}"
+
+            page.update()
+
+        image_picker = ft.FilePicker(on_result=handle_image_upload)
+        voice_picker = ft.FilePicker(on_result=handle_voice_upload)
+
         page.overlay.append(image_picker)
+        page.overlay.append(voice_picker)
 
         image_btn = ft.ElevatedButton(
             "📷 이미지 추가",
@@ -267,10 +276,6 @@ def main(page: ft.Page):
             bgcolor="#334155",
             color="white",
         )
-
-        # 음성 파일 선택창
-        voice_picker = ft.FilePicker(on_result=lambda e: handle_voice_upload(e, input_box, page))
-        page.overlay.append(voice_picker)
 
         voice_btn = ft.ElevatedButton(
             "🎤 음성 기록",
