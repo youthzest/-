@@ -11,17 +11,20 @@ APP_PASSWORD = os.environ.get("APP_PASSWORD")
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
 def handle_image_upload(e, input_box, page):
-    if e.files:
-        file = e.files[0]
-
-        input_box.value += "\n[이미지 분석 중...]"
+    if not e.files or not e.files[0]:
+        input_box.value += "\n이미지 파일 없음"
         page.update()
+        return
 
-        try:
-            import base64
+    file = e.files[0]
 
-            with open(file.path, "rb") as image_file:
-                image_base64 = base64.b64encode(image_file.read()).decode()
+    input_box.value += "\n[이미지 분석 중...]"
+    page.update()
+
+    try:
+        import base64
+
+        image_base64 = base64.b64encode(file.bytes).decode()
 
             response = client.chat.completions.create(
                 model="gpt-4o-mini",
@@ -175,7 +178,7 @@ def generate_reading_knowledge(text, book_title, author, chapter, client):
     return response.choices[0].message.content
 
 
-def save_to_obsidian(content):
+def api_save_to_obsidian(content):
 
     try:
         # GPT 결과에서 저장 경로 추출
@@ -260,7 +263,7 @@ def main(page: ft.Page):
 
         image_btn = ft.ElevatedButton(
             "📷 이미지 추가",
-            on_click=lambda _: image_picker.pick_files(allow_multiple=False),
+            on_click=lambda _: image_picker.pick_files(allow_multiple=False, with_data=True),
             bgcolor="#334155",
             color="white",
         )
@@ -317,8 +320,8 @@ def main(page: ft.Page):
             color="white",
         )
 
-        def obsidian_save_click(e):
-            result = save_to_obsidian(input_box.value)
+        def save_to_obsidian(e):
+            result = api_save_to_obsidian(input_box.value)
             if str(result).startswith("20"):
                 page.snack_bar = ft.SnackBar(ft.Text("저장 완료"), bgcolor="#22c55e")
             else:
@@ -328,7 +331,7 @@ def main(page: ft.Page):
 
         obsidian_save_btn = ft.ElevatedButton(
             "옵시디언 저장",
-            on_click=obsidian_save_click,
+            on_click=save_to_obsidian,
             bgcolor="#14b8a6",
             color="white",
         )
