@@ -5,7 +5,7 @@ import requests
 import base64
 
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
-REPO_NAME = "아이디/레포이름"
+REPO_NAME = "youthzest/-"
 APP_PASSWORD = os.environ.get("APP_PASSWORD")
 
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
@@ -106,6 +106,8 @@ def generate_reading_knowledge(text, book_title, author, chapter, client):
 
 
 def api_save_to_obsidian(content):
+    if REPO_NAME == "아이디/레포이름":
+        return "에러: main.py 위쪽에 있는 REPO_NAME 값을 실제 깃허브 아이디와 레포지토리 이름으로 수정해주세요! (예: myid/myrepo)"
 
     try:
         # GPT 결과에서 저장 경로 추출
@@ -185,34 +187,35 @@ def main(page: ft.Page):
             color="white",
         )
 
-        def handle_image_upload(e):
+        def handle_image_result(e: ft.FilePickerResultEvent):
             if not e.files:
-                input_box.value += "\n이미지 없음"
+                input_box.value += "\n이미지 취소됨"
                 page.update()
                 return
 
-            file = e.files[0]
+            f = e.files[0]
+            input_box.value += f"\n[이미지 여는 중... {f.name}]"
+            page.update()
+            
+            upload_url = page.get_upload_url(f.name, 60)
+            image_picker.upload([ft.FilePickerUploadFile(f.name, upload_url=upload_url)])
 
-            if not file:
-                input_box.value += "\n이미지 파일 없음"
+        def handle_image_upload(e: ft.FilePickerUploadEvent):
+            if e.error:
+                input_box.value += f"\n이미지 읽기 오류: {e.error}"
                 page.update()
                 return
-
+                
             input_box.value += "\n[이미지 분석 중...]"
             page.update()
 
+            file_path = os.path.join("uploads", e.file_name)
             try:
-                import base64
-                if file.bytes:
-                    image_data = file.bytes
-                elif hasattr(file, 'path') and file.path:
-                    with open(file.path, "rb") as image_file:
-                        image_data = image_file.read()
-                else:
-                    raise Exception("파일 데이터를 읽을 수 없습니다. (웹/모바일 환경 오류)")
+                with open(file_path, "rb") as image_file:
+                    image_data = image_file.read()
                 
                 image_base64 = base64.b64encode(image_data).decode()
-
+                
                 response = client.chat.completions.create(
                     model="gpt-4o-mini",
                     messages=[
@@ -220,74 +223,66 @@ def main(page: ft.Page):
                             "role": "user",
                             "content": [
                                 {"type": "text", "text": "이미지의 텍스트를 추출해줘"},
-                                {
-                                    "type": "image_url",
-                                    "image_url": {
-                                        "url": f"data:image/png;base64,{image_base64}"
-                                    },
-                                },
+                                {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{image_base64}"}},
                             ],
                         }
                     ],
                 )
-
-                extracted_text = response.choices[0].message.content
-                input_box.value += f"\n[이미지 내용]\n{extracted_text}"
-
+                input_box.value += f"\n[이미지 내용]\n{response.choices[0].message.content}"
             except Exception as err:
                 input_box.value += f"\n[이미지 처리 실패] {err}"
-
             page.update()
 
-        def handle_voice_upload(e):
+        def handle_voice_result(e: ft.FilePickerResultEvent):
             if not e.files:
-                input_box.value += "\n음성 파일 없음"
+                input_box.value += "\n음성 취소됨"
                 page.update()
                 return
 
-            audio_file = e.files[0]
-            
+            f = e.files[0]
+            input_box.value += f"\n[음성 여는 중... {f.name}]"
+            page.update()
+
+            upload_url = page.get_upload_url(f.name, 60)
+            voice_picker.upload([ft.FilePickerUploadFile(f.name, upload_url=upload_url)])
+
+        def handle_voice_upload(e: ft.FilePickerUploadEvent):
+            if e.error:
+                input_box.value += f"\n음성 읽기 오류: {e.error}"
+                page.update()
+                return
+                
             input_box.value += "\n[음성 분석 중...]"
             page.update()
 
+            file_path = os.path.join("uploads", e.file_name)
             try:
-                import io
-                if audio_file.bytes:
-                    file_obj = io.BytesIO(audio_file.bytes)
-                    file_obj.name = audio_file.name
-                elif hasattr(audio_file, 'path') and audio_file.path:
-                    file_obj = open(audio_file.path, "rb")
-                else:
-                    raise Exception("파일 데이터를 찾을 수 없습니다. (웹/모바일 환경 오류)")
-
-                transcript = client.audio.transcriptions.create(
-                    model="gpt-4o-transcribe",
-                    file=file_obj
-                )
-
+                with open(file_path, "rb") as f:
+                    transcript = client.audio.transcriptions.create(
+                        model="gpt-4o-transcribe",
+                        file=f
+                    )
                 input_box.value += f"\n[음성 내용]\n{transcript.text}"
-
             except Exception as err:
                 input_box.value += f"\n[음성 처리 실패] {err}"
-
             page.update()
 
-        image_picker = ft.FilePicker(on_result=handle_image_upload)
-        voice_picker = ft.FilePicker(on_result=handle_voice_upload)
+        image_picker = ft.FilePicker(on_result=handle_image_result, on_upload=handle_image_upload)
+        voice_picker = ft.FilePicker(on_result=handle_voice_result, on_upload=handle_voice_upload)
 
         page.overlay.append(image_picker)
         page.overlay.append(voice_picker)
 
         image_btn = ft.ElevatedButton(
             "📷 이미지 추가",
-            on_click=lambda _: image_picker.pick_files(allow_multiple=False, with_data=True),
+            on_click=lambda _: image_picker.pick_files(allow_multiple=False),
             bgcolor="#334155",
             color="white",
         )
 
         voice_btn = ft.ElevatedButton(
             "🎤 음성 기록",
-            on_click=lambda _: voice_picker.pick_files(allow_multiple=False, with_data=True),
+            on_click=lambda _: voice_picker.pick_files(allow_multiple=False),
             bgcolor="#334155",
             color="white",
         )
@@ -388,4 +383,4 @@ def main(page: ft.Page):
                 ft.ElevatedButton("로그인", on_click=check_password)
             ])
         )
-ft.app(target=main, port=10000)
+ft.app(target=main, port=10000, upload_dir="uploads")
